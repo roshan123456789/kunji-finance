@@ -16,7 +16,7 @@ import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
-contract BatchedVault is
+contract UsersVault is
     ERC4626Upgradeable,
     OwnableUpgradeable,
     PausableUpgradeable,

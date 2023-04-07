@@ -31,7 +31,7 @@ contract TraderWallet is OwnableUpgradeable {
 
     uint256[50] __gap;
 
-    error ZeroAddrees(string _target);
+    error ZeroAddress(string _target);
     error ZeroAmount();
     error UnderlyingAssetNotAllowed();
     error CallerNotAllowed();
@@ -45,7 +45,6 @@ contract TraderWallet is OwnableUpgradeable {
     error SendToTraderFailed();
     error AmountToScaleNotFound();
     error NothingToScale();
-
 
     event VaultAddressSet(address indexed vaultAddress);
     event UnderlyingTokenAddressSet(address indexed underlyingTokenAddress);
@@ -95,8 +94,8 @@ contract TraderWallet is OwnableUpgradeable {
         _;
     }
 
-    modifier onlyValidAddress(address _variable, string memory _message) {
-        if (_variable == address(0)) revert ZeroAddrees({_target: _message});
+    modifier notZeroAddress(address _variable, string memory _message) {
+        if (_variable == address(0)) revert ZeroAddress({_target: _message});
         _;
     }
 
@@ -108,18 +107,22 @@ contract TraderWallet is OwnableUpgradeable {
         address _traderAddress,
         address _dynamicValueAddress
     ) external initializer {
+        // CHECK CALLER IS THE FACTORY
+
         if (_vaultAddress == address(0))
-            revert ZeroAddrees({_target: "_vaultAddress"});
+            revert ZeroAddress({_target: "_vaultAddress"});
         if (_underlyingTokenAddress == address(0))
-            revert ZeroAddrees({_target: "_underlyingTokenAddress"});
+            revert ZeroAddress({_target: "_underlyingTokenAddress"});
         if (_adaptersRegistryAddress == address(0))
-            revert ZeroAddrees({_target: "_adaptersRegistryAddress"});
+            revert ZeroAddress({_target: "_adaptersRegistryAddress"});
         if (_contractsFactoryAddress == address(0))
-            revert ZeroAddrees({_target: "_contractsFactoryAddress"});
+            revert ZeroAddress({_target: "_contractsFactoryAddress"});
         if (_traderAddress == address(0))
-            revert ZeroAddrees({_target: "_traderAddress"});
+            revert ZeroAddress({_target: "_traderAddress"});
+        // CHECK TRADER IS ALLOWED
+
         if (_dynamicValueAddress == address(0))
-            revert ZeroAddrees({_target: "_dynamicValueAddress"});
+            revert ZeroAddress({_target: "_dynamicValueAddress"});
 
         __Ownable_init();
 
@@ -140,7 +143,7 @@ contract TraderWallet is OwnableUpgradeable {
 
     function setVaultAddress(
         address _vaultAddress
-    ) external onlyOwner onlyValidAddress(_vaultAddress, "_vaultAddress") {
+    ) external onlyOwner notZeroAddress(_vaultAddress, "_vaultAddress") {
         emit VaultAddressSet(_vaultAddress);
         vaultAddress = _vaultAddress;
     }
@@ -150,7 +153,7 @@ contract TraderWallet is OwnableUpgradeable {
     )
         external
         onlyOwner
-        onlyValidAddress(_adaptersRegistryAddress, "_adaptersRegistryAddress")
+        notZeroAddress(_adaptersRegistryAddress, "_adaptersRegistryAddress")
     {
         emit AdaptersRegistryAddressSet(_adaptersRegistryAddress);
         adaptersRegistryAddress = _adaptersRegistryAddress;
@@ -161,7 +164,7 @@ contract TraderWallet is OwnableUpgradeable {
     )
         external
         onlyOwner
-        onlyValidAddress(_dynamicValueAddress, "_dynamicValueAddress")
+        notZeroAddress(_dynamicValueAddress, "_dynamicValueAddress")
     {
         emit DynamicValueAddressSet(_dynamicValueAddress);
         dynamicValueAddress = _dynamicValueAddress;
@@ -172,7 +175,7 @@ contract TraderWallet is OwnableUpgradeable {
     )
         external
         onlyOwner
-        onlyValidAddress(_contractsFactoryAddress, "_contractsFactoryAddress")
+        notZeroAddress(_contractsFactoryAddress, "_contractsFactoryAddress")
     {
         emit ContractsFactoryAddressSet(_contractsFactoryAddress);
         contractsFactoryAddress = _contractsFactoryAddress;
@@ -183,7 +186,7 @@ contract TraderWallet is OwnableUpgradeable {
     )
         external
         onlyTrader
-        onlyValidAddress(_underlyingTokenAddress, "_underlyingTokenAddress")
+        notZeroAddress(_underlyingTokenAddress, "_underlyingTokenAddress")
     {
         emit UnderlyingTokenAddressSet(_underlyingTokenAddress);
         underlyingTokenAddress = _underlyingTokenAddress;
@@ -191,7 +194,7 @@ contract TraderWallet is OwnableUpgradeable {
 
     function setTraderAddress(
         address _traderAddress
-    ) external onlyOwner onlyValidAddress(_traderAddress, "_traderAddress") {
+    ) external onlyOwner notZeroAddress(_traderAddress, "_traderAddress") {
         if (
             !IContractsFactory(contractsFactoryAddress).isTraderAllowed(
                 _traderAddress
@@ -323,7 +326,7 @@ contract TraderWallet is OwnableUpgradeable {
         if (!IAdapter(adapterAddress).isOperationAllowed(_traderOperation))
             revert InvalidOperation({_target: "_traderOperationStruct"});
 
-        // DELEGATE CALL        
+        // DELEGATE CALL
         /*
             // IAdapter adapter = IAdapter(adapterAddress);
             // (bool success, bytes memory returnedData) = address(adapter)

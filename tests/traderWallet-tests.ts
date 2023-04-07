@@ -10,7 +10,7 @@ import { expect } from "chai";
 import Reverter from "./helpers/reverter";
 import {
   TraderWallet,
-  ContractsFactory,
+  ContractsFactoryMock,
   AdaptersRegistry,
   AdapterOperations,
   UserVault,
@@ -132,7 +132,7 @@ describe("Trader Wallet Contract Tests", function () {
               dynamicValueAddress,
             ])
           )
-            .to.be.revertedWithCustomError(TraderWalletFactory, "ZeroAddrees")
+            .to.be.revertedWithCustomError(TraderWalletFactory, "ZeroAddress")
             .withArgs("_vaultAddress");
         });
 
@@ -147,7 +147,7 @@ describe("Trader Wallet Contract Tests", function () {
               dynamicValueAddress,
             ])
           )
-            .to.be.revertedWithCustomError(TraderWalletFactory, "ZeroAddrees")
+            .to.be.revertedWithCustomError(TraderWalletFactory, "ZeroAddress")
             .withArgs("_underlyingTokenAddress");
         });
 
@@ -162,7 +162,7 @@ describe("Trader Wallet Contract Tests", function () {
               dynamicValueAddress,
             ])
           )
-            .to.be.revertedWithCustomError(TraderWalletFactory, "ZeroAddrees")
+            .to.be.revertedWithCustomError(TraderWalletFactory, "ZeroAddress")
             .withArgs("_adaptersRegistryAddress");
         });
 
@@ -177,7 +177,7 @@ describe("Trader Wallet Contract Tests", function () {
               dynamicValueAddress,
             ])
           )
-            .to.be.revertedWithCustomError(TraderWalletFactory, "ZeroAddrees")
+            .to.be.revertedWithCustomError(TraderWalletFactory, "ZeroAddress")
             .withArgs("_contractsFactoryAddress");
         });
 
@@ -192,7 +192,7 @@ describe("Trader Wallet Contract Tests", function () {
               dynamicValueAddress,
             ])
           )
-            .to.be.revertedWithCustomError(TraderWalletFactory, "ZeroAddrees")
+            .to.be.revertedWithCustomError(TraderWalletFactory, "ZeroAddress")
             .withArgs("_traderAddress");
         });
 
@@ -207,7 +207,7 @@ describe("Trader Wallet Contract Tests", function () {
               ZERO_ADDRESS,
             ])
           )
-            .to.be.revertedWithCustomError(TraderWalletFactory, "ZeroAddrees")
+            .to.be.revertedWithCustomError(TraderWalletFactory, "ZeroAddress")
             .withArgs("_dynamicValueAddress");
         });
       });
@@ -295,7 +295,7 @@ describe("Trader Wallet Contract Tests", function () {
                 )
                   .to.be.revertedWithCustomError(
                     traderWalletContract,
-                    "ZeroAddrees"
+                    "ZeroAddress"
                   )
                   .withArgs("_vaultAddress");
               });
@@ -345,7 +345,7 @@ describe("Trader Wallet Contract Tests", function () {
                 )
                   .to.be.revertedWithCustomError(
                     traderWalletContract,
-                    "ZeroAddrees"
+                    "ZeroAddress"
                   )
                   .withArgs("_adaptersRegistryAddress");
               });
@@ -395,7 +395,7 @@ describe("Trader Wallet Contract Tests", function () {
                 )
                   .to.be.revertedWithCustomError(
                     traderWalletContract,
-                    "ZeroAddrees"
+                    "ZeroAddress"
                   )
                   .withArgs("_contractsFactoryAddress");
               });
@@ -445,7 +445,7 @@ describe("Trader Wallet Contract Tests", function () {
                 )
                   .to.be.revertedWithCustomError(
                     traderWalletContract,
-                    "ZeroAddrees"
+                    "ZeroAddress"
                   )
                   .withArgs("_dynamicValueAddress");
               });
@@ -498,7 +498,7 @@ describe("Trader Wallet Contract Tests", function () {
                 )
                   .to.be.revertedWithCustomError(
                     traderWalletContract,
-                    "ZeroAddrees"
+                    "ZeroAddress"
                   )
                   .withArgs("_underlyingTokenAddress");
               });
@@ -529,15 +529,15 @@ describe("Trader Wallet Contract Tests", function () {
 
         describe("WHEN trying to set the traderAddress", async () => {
           let FactoryOfContractsFactory: ContractFactory;
-          let contractsFactoryContract: ContractsFactory;
+          let contractsFactoryContract: ContractsFactoryMock;
 
           before(async () => {
             // deploy mocked factory
             FactoryOfContractsFactory = await ethers.getContractFactory(
-              "ContractsFactory"
+              "ContractsFactoryMock"
             );
             contractsFactoryContract =
-              (await FactoryOfContractsFactory.deploy()) as ContractsFactory;
+              (await FactoryOfContractsFactory.deploy()) as ContractsFactoryMock;
             await contractsFactoryContract.deployed();
 
             // change address to mocked factory
@@ -565,7 +565,7 @@ describe("Trader Wallet Contract Tests", function () {
                 )
                   .to.be.revertedWithCustomError(
                     traderWalletContract,
-                    "ZeroAddrees"
+                    "ZeroAddress"
                   )
                   .withArgs("_traderAddress");
               });
