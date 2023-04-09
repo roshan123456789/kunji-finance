@@ -15,57 +15,42 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 // import {PriceHelper} from "../../libraries/PriceHelper.sol";
 
 import "../../interfaces/IPlatformAdapter.sol";
+import "../../interfaces/IAdapter.sol";
 import "./interfaces/IGMXAdapter.sol";
 
-contract GMXAdapter is OwnableUpgradeable {
+library GMXAdapter {
     error AddressZero();
     error InvalidOperationId();
 
-    IGmxReader public gmxReader;
-    IGmxRouter public gmxRouter;
-    IGmxPositionRouter public gmxPositionRouter;
-    IGmxVault public gmxVault;
+    IGmxReader constant public gmxReader = IGmxReader(0xaBBc5F99639c9B6bCb58544ddf04EFA6802F4064);
+    IGmxRouter constant public gmxRouter = IGmxRouter(0xb87a436B93fFE9D75c5cFA7bAcFff96430b09868);
+    IGmxPositionRouter constant public gmxPositionRouter = IGmxPositionRouter(0x22199a49A999c351eF7927602CFB187ec3cae489);
+    IGmxVault constant public gmxVault = IGmxVault(0x489ee077994B6658eAfA855C308275EAd8097C4A);
 
-    struct AdapterOperation {
-        uint8 operationId;
-        bytes data;
-    }
+    uint256 constant public ratioDenominator = 1e18;
 
-    function initialize(
-        address _gmxRouter,
-        address _gmxPositionRouter,
-        address _gmxReader,
-        address _gmxVault
-    ) external initializer {
-        if (
-            _gmxRouter == address(0) ||
-            _gmxPositionRouter == address(0) ||
-            _gmxReader == address(0) ||
-            _gmxVault == address(0)
-        ) revert AddressZero();
-        gmxRouter = IGmxRouter(_gmxRouter);
-        gmxPositionRouter = IGmxPositionRouter(_gmxPositionRouter);
-        gmxReader = IGmxReader(_gmxReader);
-        gmxVault = IGmxVault(_gmxVault);
-    }
+    /// @notice The maximum slippage allowance
+    uint256 constant public slippageMax = 1e17;  // 10%
+
 
     /// @notice Gives approve to operate with gmxPositionRouter
     /// @dev Needs to be called with delegatecall from wallet and vault in initialization
+    // @todo move to contract constructor
     function initApprove() external {
         gmxRouter.approvePlugin(address(gmxPositionRouter));
     }
 
-    // @todo refactor input params according updates in the Wallet
     function executeOperation(
-        AdapterOperation memory traderOperation
+        uint256 ratio,
+        IAdapter.AdapterOperation memory traderOperation
     ) external returns (bytes32) {
         if (traderOperation.operationId == 0) {
-            uint256 outputAmount = _swap(traderOperation.data);
+            uint256 outputAmount = _swap(ratio, traderOperation.data);
             return bytes32(abi.encodePacked(outputAmount));
         } else if (traderOperation.operationId == 1) {
-            return _increasePosition(traderOperation.data);
+            return _increasePosition(ratio, traderOperation.data);
         } else if (traderOperation.operationId == 2) {
-            return _decreasePosition(traderOperation.data);
+            return _decreasePosition(ratio, traderOperation.data);
         }
 
         revert InvalidOperationId();
@@ -81,8 +66,7 @@ contract GMXAdapter is OwnableUpgradeable {
         receiver:   address of the receiver of tokenOut (will be address(this) in terms of delegate call)
     @return boughtAmount - bought amount of target swap token
     */
-    // @todo refactor input params according updates in the Wallet
-    function _swap(bytes memory tradeData) internal returns (uint256) {
+    function _swap(uint256 ratio, bytes memory tradeData) internal returns (uint256) {
         (address[] memory path, uint256 amountIn, uint256 minOut) = abi.decode(
             tradeData,
             (address[], uint256, uint256)
@@ -90,6 +74,13 @@ contract GMXAdapter is OwnableUpgradeable {
 
         address tokenOut = path[path.length - 1];
         uint256 balance = IERC20(tokenOut).balanceOf(address(this));
+
+        if (ratio != ratioDenominator) {
+            // scaling for Vault
+            amountIn = amountIn * ratio / ratioDenominator;
+            // increasing slippage allowance due to higher amounts
+            minOut = minOut * ratio / (ratioDenominator + slippageMax);
+        }
 
         _checkUpdateAllowance(tokenOut, address(gmxRouter), amountIn);
         gmxRouter.swap(path, amountIn, minOut, address(this));
@@ -117,6 +108,7 @@ contract GMXAdapter is OwnableUpgradeable {
     @return requestKey - Id in GMX increase position orders
     */
     function _increasePosition(
+        uint256 ratio,
         bytes memory tradeData
     ) internal returns (bytes32 requestKey) {
         (
@@ -131,6 +123,14 @@ contract GMXAdapter is OwnableUpgradeable {
                 tradeData,
                 (address[], address, uint256, uint256, uint256, bool, uint256)
             );
+
+        if (ratio != ratioDenominator) {
+            // scaling for Vault
+            amountIn = amountIn * ratio / ratioDenominator;
+            sizeDelta = sizeDelta * ratio / ratioDenominator;
+            // increasing slippage allowance due to higher amounts
+            minOut = minOut * ratio / (ratioDenominator + slippageMax);
+        }
 
         address tokenOut = path[path.length - 1];
         _checkUpdateAllowance(tokenOut, address(gmxPositionRouter), amountIn);
@@ -170,6 +170,7 @@ contract GMXAdapter is OwnableUpgradeable {
     @return requestKey - Id in GMX increase position orders
     */
     function _decreasePosition(
+        uint256 ratio,
         bytes memory tradeData
     ) internal returns (bytes32 requestKey) {
         (
@@ -178,7 +179,6 @@ contract GMXAdapter is OwnableUpgradeable {
             uint256 collateralDelta,
             uint256 sizeDelta,
             bool isLong,
-            address receiver,
             uint256 acceptablePrice,
             uint256 minOut
         ) = abi.decode(
@@ -189,12 +189,18 @@ contract GMXAdapter is OwnableUpgradeable {
                     uint256,
                     uint256,
                     bool,
-                    address,
                     uint256,
                     uint256
                 )
             );
         uint256 executionFee = gmxPositionRouter.minExecutionFee();
+
+        // scaling for Vault
+        if (ratio != ratioDenominator) {
+            sizeDelta = sizeDelta * ratio / ratioDenominator;
+            // increasing slippage allowance due to higher amounts
+            minOut = minOut * ratio / (ratioDenominator + slippageMax);
+        }
 
         requestKey = gmxPositionRouter.createDecreasePosition(
             path,
@@ -202,7 +208,7 @@ contract GMXAdapter is OwnableUpgradeable {
             collateralDelta,
             sizeDelta,
             isLong,
-            receiver,
+            address(this),      // receiver
             acceptablePrice,
             minOut,
             executionFee,

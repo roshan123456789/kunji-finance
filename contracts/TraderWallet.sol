@@ -8,7 +8,7 @@ import {IContractsFactory} from "./interfaces/IContractsFactory.sol";
 import {IAdaptersRegistry} from "./interfaces/IAdaptersRegistry.sol";
 import {IAdapter} from "./interfaces/IAdapter.sol";
 import {IUserVault} from "./interfaces/IUserVault.sol";
-
+import "./adapters/gmx/GMXAdapter.sol";
 // import "hardhat/console.sol";
 
 contract TraderWallet is OwnableUpgradeable {
@@ -310,10 +310,8 @@ contract TraderWallet is OwnableUpgradeable {
     function executeOnAdapter(
         uint256 _protocolId,
         IAdapter.AdapterOperation memory _traderOperation,
-        IAdapter.Parameters[] memory _parameters,
-        bool _replicate
+       bool _replicate
     ) external onlyTrader {
-        // check if protocol id is valid
         (bool isValidProtocol, address adapterAddress) = _isProtocolValid(
             _protocolId
         );
@@ -323,45 +321,14 @@ contract TraderWallet is OwnableUpgradeable {
         if (!IAdapter(adapterAddress).isOperationAllowed(_traderOperation))
             revert InvalidOperation({_target: "_traderOperationStruct"});
 
-        // DELEGATE CALL        
-        /*
-            // IAdapter adapter = IAdapter(adapterAddress);
-            // (bool success, bytes memory returnedData) = address(adapter)
-            //     .delegatecall(
-            //         abi.encodeWithSignature(
-            //             "executeOperations((uint8,bytes),Parameters[])",
-            //             _traderOperation,
-            //             _parameters
-            //         )
-            //     );
-            // IAdapter.Parameters[] memory toScaleParameters;
-            // (success, toScaleParameters) = abi.decode(
-            //     returnedData,
-            //     (bool, IAdapter.Parameters[])
-            // );
-        */
-
+        uint256 walletRatio = 1e18;
         // execute operation
-        // returns success and the params to be scaled
-        (
-            bool success,
-            IAdapter.Parameters[] memory toScaleParameters
-        ) = IAdapter(adapterAddress).executeOperations(
-                _traderOperation,
-                _parameters
-            );
-
-        // check operation success
-        if (!success) revert AdapterOperationFailed({_target: "trader"});
+        // returns the params to be scaled
+        bytes32 tradeResult = _executeOperation(_protocolId, walletRatio, _traderOperation);
 
         // contract should receive funds HERE
         // contract should receive funds HERE
         // contract should receive funds HERE
-
-        if (_replicate && toScaleParameters.length == 0) {
-            // revert if operation does not return an array to scale values
-            revert NothingToScale();
-        }
 
         emit OperationExecuted(
             _protocolId,
@@ -373,23 +340,20 @@ contract TraderWallet is OwnableUpgradeable {
 
         // if tx needs to be replicated on vault
         if (_replicate) {
-            // scale parameters
-            IAdapter.Parameters[]
-                memory scaledParameters = _scaleTraderOperation(
-                    toScaleParameters,
-                    _parameters
-                );
-
+            // get scale ratio
+            uint256 vaultRatio = _getRatio();
+            
             // call user vault
-            (success, initialVaultBalance) = IUserVault(vaultAddress)
+            (bool success, uint256 _initialVaultBalance) = IUserVault(vaultAddress)
                 .executeOnAdapter(
                     _protocolId,
-                    _traderOperation,
-                    scaledParameters
+                    vaultRatio,
+                    _traderOperation
                 );
 
             if (!success) revert AdapterOperationFailed({_target: "user"});
 
+            _initialVaultBalance = initialVaultBalance;
             emit OperationExecuted(
                 _protocolId,
                 block.timestamp,
@@ -398,6 +362,34 @@ contract TraderWallet is OwnableUpgradeable {
                 initialVaultBalance
             );
         }
+    }
+
+    function _executeOperation(
+        uint256 protocolId,
+        uint256 ratio,
+        IAdapter.AdapterOperation memory traderOperation
+        ) internal returns (bytes32) {
+        if (protocolId == 1) {
+            return _executeOnGmx(ratio, traderOperation);
+        } else if (protocolId == 2) {
+            return _executeOnUniswap(ratio, traderOperation);
+        }
+    }
+
+    function _executeOnGmx(
+        uint256 ratio,
+        IAdapter.AdapterOperation memory _traderOperation
+        ) internal returns (bytes32) {
+        GMXAdapter.executeOperation(ratio, _traderOperation);
+    }
+
+    // @todo add implementation
+    function _executeOnUniswap(
+        uint256 ratio,
+        IAdapter.AdapterOperation memory _traderOperation
+        ) internal returns (bytes32) {
+        // UniswapAdapter.executeOperation(_traderOperation);
+        return bytes32(0);
     }
 
     /*
@@ -532,5 +524,9 @@ contract TraderWallet is OwnableUpgradeable {
     function uintToString(uint256 num) public pure returns (string memory) {
         bytes memory numBytes = abi.encodePacked(num);
         return string(numBytes);
+    }
+
+    function _getRatio() internal returns (uint256) {
+        return initialVaultBalance / initialTraderBalance;
     }
 }

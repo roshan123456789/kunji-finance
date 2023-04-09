@@ -8,8 +8,8 @@ import {IAdapter} from "./IAdapter.sol";
 interface IUserVault is IERC4626Upgradeable {
     function executeOnAdapter(
         uint256 _protocolId,
-        IAdapter.AdapterOperation memory _vaultOperation,
-        IAdapter.Parameters[] memory _parameters        
+        uint256 _scaleRatio,
+        IAdapter.AdapterOperation memory _vaultOperation
     ) external returns (bool, uint256);
 
     function rolloverFromTrader() external returns (bool);

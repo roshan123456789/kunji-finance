@@ -1052,8 +1052,8 @@ describe("Trader Wallet Contract Tests", function () {
           let adapterOperationsContract: AdapterOperations;
 
           const traderOperation = {
-            _operationId: 10,
-            _data: ethers.utils.hexlify("0x1234"),
+            operationId: 10,
+            data: ethers.utils.hexlify("0x1234"),
           };
 
           const parameters = [
